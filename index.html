@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pediatric Dosage Calculator POC</title>
+
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Google Fonts: Sarabun -->
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background-color: #f0fdf4;
+      /* Mint-50 */
+    }
+
+    .card-shadow {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .input-focus:focus {
+      outline: none;
+      ring: 2px;
+      border-color: #10b981;
+      /* Emerald-500 */
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // --- Mock Data: ฐานข้อมูลยา (ปรับปรุงตามสูตร Legacy Code) ---
+    // หมายเหตุ: defaultDoseMgPerKg ถูกคำนวณย้อนกลับจากสูตร Volume (ml) ในโค้ดเก่า เพื่อให้รองรับการเปลี่ยน Concentration ได้
+
+    const initialDrugs = [
+      {
+        id: 'para',
+        name: 'Paracetamol',
+        genericName: 'Paracetamol',
+        category: 'fever',
+        categoryLabel: 'ลดไข้ / แก้ปวด',
+        color: 'bg-pink-100 text-pink-800',
+        defaultDoseMgPerKg: 12, // Legacy: w*0.5 at 120/5 => (0.5*120)/5 = 12 mg/kg
+        frequency: 'ทุก 4-6 ชม. เวลาปวด/มีไข้',
+        concentrations: [
+          { label: 'Syrup 120 mg / 5 ml', mg: 120, ml: 5 },
+          { label: 'Syrup 250 mg / 5 ml', mg: 250, ml: 5 },
+          { label: 'Drops 60 mg / 0.6 ml', mg: 60, ml: 0.6 }
+        ],
+        warning: 'ห้ามเกิน 5 ครั้ง/วัน'
+      },
+      {
+        id: 'ibu',
+        name: 'Ibuprofen',
+        genericName: 'Ibuprofen',
+        category: 'fever',
+        categoryLabel: 'ลดไข้สูง / อักเสบ',
+        color: 'bg-orange-100 text-orange-800',
+        defaultDoseMgPerKg: 5, // Legacy: GA = w*0.25 at 100/5 => (0.25*100)/5 = 5 mg/kg
+        frequency: 'ทุก 6-8 ชม. หลังอาหารทันที',
+        concentrations: [
+          { label: 'Syrup 100 mg / 5 ml', mg: 100, ml: 5 },
+          { label: 'Suspension 200 mg / 5 ml', mg: 200, ml: 5 }
+        ],
+        warning: 'ระวังโรคกระเพาะ'
+      },
+      {
+        id: 'gg',
+        name: 'Guaifenesin',
+        genericName: 'Guaifenesin (GG)',
+        category: 'respiratory',
+        categoryLabel: 'ละลายเสมหะ',
+        color: 'bg-teal-100 text-teal-800',
+        defaultDoseMgPerKg: 5, // Legacy: AA = w*0.25 at 100/5 => 5 mg/kg/dose
+        frequency: 'วันละ 3-4 ครั้ง หลังอาหาร',
+        concentrations: [
+          { label: 'Syrup 100 mg / 5 ml', mg: 100, ml: 5 }
+        ],
+        warning: 'ดื่มน้ำตามมากๆ'
+      },
+      {
+        id: 'cpm',
+        name: 'CPM',
+        genericName: 'Chlorpheniramine',
+        category: 'respiratory',
+        categoryLabel: 'ลดน้ำมูก / ภูมิแพ้',
+        color: 'bg-yellow-100 text-yellow-800',
+        defaultDoseMgPerKg: 0.1, // Legacy: BA = w*0.25 at 2/5 => (0.25*2)/5 = 0.1 mg/kg/dose
+        frequency: 'วันละ 3-4 ครั้ง หลังอาหาร',
+        concentrations: [
+          { label: 'Syrup 2 mg / 5 ml', mg: 2, ml: 5 }
+        ],
+        warning: 'อาจทำให้ง่วงซึม'
+      },
+      {
+        id: 'salbu',
+        name: 'Salbutamol',
+        genericName: 'Salbutamol',
+        category: 'respiratory',
+        categoryLabel: 'ขยายหลอดลม',
+        color: 'bg-purple-100 text-purple-800',
+        defaultDoseMgPerKg: 0.1, // Legacy: EA = w*0.25 at 2/5 => 0.1 mg/kg/dose
+        frequency: 'วันละ 3-4 ครั้ง หลังอาหาร',
+        concentrations: [
+          { label: 'Syrup 2 mg / 5 ml', mg: 2, ml: 5 }
+        ],
+        warning: 'อาจมีอาการใจสั่น'
+      },
+      {
+        id: 'amox',
+        name: 'Amoxycillin',
+        genericName: 'Amoxycillin',
+        category: 'infection',
+        categoryLabel: 'ฆ่าเชื้อแบคทีเรีย',
+        color: 'bg-blue-100 text-blue-800',
+        defaultDoseMgPerKg: 12.5, // Legacy: HC2 = w*0.5 at 125/5 => (0.5*125)/5 = 12.5 mg/kg/dose
+        frequency: 'วันละ 3 ครั้ง หลังอาหาร',
+        concentrations: [
+          { label: 'Dry Syrup 125 mg / 5 ml', mg: 125, ml: 5 },
+          { label: 'Dry Syrup 250 mg / 5 ml', mg: 250, ml: 5 }
+        ],
+        warning: 'ทานติดต่อกันจนหมดขวด'
+      },
+      {
+        id: 'dicloxa',
+        name: 'Dicloxacillin',
+        genericName: 'Dicloxacillin',
+        category: 'infection',
+        categoryLabel: 'ฆ่าเชื้อ (ผิวหนัง/แผล)',
+        color: 'bg-indigo-100 text-indigo-800',
+        defaultDoseMgPerKg: 6.25, // Legacy: IA = w*0.5 at 62.5/5 => (0.5*62.5)/5 = 6.25 mg/kg/dose
+        frequency: 'วันละ 4 ครั้ง ก่อนอาหาร',
+        concentrations: [
+          { label: 'Dry Syrup 62.5 mg / 5 ml', mg: 62.5, ml: 5 }
+        ],
+        warning: 'ทานตอนท้องว่าง'
+      },
+      {
+        id: 'cotrim',
+        name: 'Co-trimoxazole',
+        genericName: 'Co-trimoxazole',
+        category: 'infection',
+        categoryLabel: 'ฆ่าเชื้อ',
+        color: 'bg-cyan-100 text-cyan-800',
+        defaultDoseMgPerKg: 4, // Legacy: DA = w*0.5 at 40/5 => (0.5*40)/5 = 4 mg/kg (TMP)
+        frequency: 'วันละ 2 ครั้ง หลังอาหาร',
+        concentrations: [
+          { label: 'Suspension 40 mg / 5 ml', mg: 40, ml: 5 }
+        ],
+        warning: 'ดื่มน้ำตามมากๆ'
+      },
+      {
+        id: 'dom',
+        name: 'Domperidone',
+        genericName: 'Domperidone',
+        category: 'stomach',
+        categoryLabel: 'แก้อาเจียน',
+        color: 'bg-green-100 text-green-800',
+        defaultDoseMgPerKg: 0.25, // Legacy: CA = w*0.25 at 5/5 => (0.25*5)/5 = 0.25 mg/kg
+        frequency: 'วันละ 3 ครั้ง ก่อนอาหาร',
+        concentrations: [
+          { label: 'Suspension 5 mg / 5 ml', mg: 5, ml: 5 }
+        ],
+        warning: ''
+      },
+      {
+        id: 'hyoscine',
+        name: 'Hyoscine',
+        genericName: 'Hyoscine',
+        category: 'stomach',
+        categoryLabel: 'แก้ปวดท้อง',
+        color: 'bg-lime-100 text-lime-800',
+        defaultDoseMgPerKg: 0.5, // Legacy: JA = w*0.5 at 5/5 => 0.5 mg/kg
+        frequency: 'วันละ 3 ครั้ง ก่อนอาหาร',
+        concentrations: [
+          { label: 'Syrup 5 mg / 5 ml', mg: 5, ml: 5 }
+        ],
+        warning: ''
+      },
+      {
+        id: 'alum',
+        name: 'Alum Milk',
+        genericName: 'Alum Milk',
+        category: 'stomach',
+        categoryLabel: 'ลดกรด / เคลือบกระเพาะ',
+        color: 'bg-gray-100 text-gray-800',
+        defaultDoseMgPerKg: 0.5, // Legacy: KA = w*0.5 (Volume based)
+        isVolumeBased: true, // Flag special calculation
+        frequency: 'วันละ 3 ครั้ง หลังอาหาร',
+        concentrations: [
+          { label: 'Suspension (Dosage by Vol)', mg: 1, ml: 1 } // Dummy conc for volume based
+        ],
+        warning: 'เขย่าขวดก่อนใช้'
+      }
+    ];
+
+    // --- Helper Components ---
+
+    const CategoryBadge = ({ label, colorClass }) => (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${colorClass}`}>
+        {label}
+      </span>
+    );
+
+    const ConcentrationSelector = ({ concentrations, selectedIndex, onChange }) => (
+      <div className="relative inline-block w-full">
+        <select
+          className="block w-full px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
+          value={selectedIndex}
+          onChange={(e) => onChange(parseInt(e.target.value))}
+        >
+          {concentrations.map((conc, idx) => (
+            <option key={idx} value={idx}>
+              {conc.label}
+            </option>
+          ))}
+        </select>
+        <div className="text-xs text-gray-500 mt-1">
+          ความเข้มข้นยา (เลือกให้ตรงขวด)
+        </div>
+      </div>
+    );
+
+    // --- Main Application Component ---
+
+    function App() {
+      const [weight, setWeight] = useState('');
+      const [searchTerm, setSearchTerm] = useState('');
+
+      // State เก็บ Index ของความเข้มข้นที่เลือก สำหรับยาแต่ละตัว { 'para': 0, 'amox': 1 }
+      const [selectedConcMap, setSelectedConcMap] = useState({});
+
+      // Initialize default concentrations (index 0)
+      useEffect(() => {
+        const defaults = {};
+        initialDrugs.forEach(drug => {
+          defaults[drug.id] = 0;
+        });
+        setSelectedConcMap(defaults);
+      }, []);
+
+      const handleWeightChange = (e) => {
+        const val = e.target.value;
+        if (val === '' || /^\d*\.?\d*$/.test(val)) { // Allow only numbers and dot
+          setWeight(val);
+        }
+      };
+
+      const handleConcChange = (drugId, newIndex) => {
+        setSelectedConcMap(prev => ({
+          ...prev,
+          [drugId]: newIndex
+        }));
+      };
+
+      const calculateDose = (drug) => {
+        const w = parseFloat(weight);
+        if (!w || w <= 0) return { ml: 0, teaspoon: 0, doseMg: 0 };
+
+        // Special Case for Alum Milk (Volume Based)
+        if (drug.isVolumeBased) {
+          const vol = w * drug.defaultDoseMgPerKg; // Here dose is actually ml/kg
+          return {
+            ml: vol.toFixed(1),
+            teaspoon: (vol / 5).toFixed(1),
+            doseMg: '-'
+          };
+        }
+
+        const concIndex = selectedConcMap[drug.id] || 0;
+        const conc = drug.concentrations[concIndex];
+
+        // Logic: Volume (ml) = (Weight (kg) * Dose (mg/kg)) / Conc (mg/ml)
+        // Conc (mg/ml) = conc.mg / conc.ml
+
+        const targetDoseTotalMg = w * drug.defaultDoseMgPerKg;
+        const concentrationMgPerMl = conc.mg / conc.ml;
+
+        const volumeMl = targetDoseTotalMg / concentrationMgPerMl;
+
+        // Rounding for practicality
+        let displayMl = volumeMl.toFixed(1);
+        // Teaspoon approximation (1 tsp = 5 ml)
+        const teaspoon = (volumeMl / 5).toFixed(1);
+
+        return {
+          ml: displayMl,
+          teaspoon: teaspoon,
+          doseMg: targetDoseTotalMg.toFixed(0)
+        };
+      };
+
+      const filteredDrugs = useMemo(() => {
+        return initialDrugs.filter(d =>
+          d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          d.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          d.categoryLabel.includes(searchTerm)
+        );
+      }, [searchTerm]);
+
+      return (
+        <div className="min-h-screen pb-10">
+
+          {/* Header */}
+          <header className="bg-emerald-600 text-white p-4 shadow-md sticky top-0 z-10">
+            <div className="max-w-2xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <i className="fa-solid fa-prescription-bottle-medical text-2xl"></i>
+                <div>
+                  <h1 className="text-lg font-bold leading-tight">Rx Kids Calculator</h1>
+                  <p className="text-xs text-emerald-100">โปรแกรมคำนวณขนาดยาน้ำเด็ก</p>
+                </div>
+              </div>
+              <div className="text-right text-xs opacity-80">
+                MVP Version 1.1<br />Updated Formulas
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-2xl mx-auto p-4 space-y-6">
+
+            {/* INPUT SECTION (Zone A) */}
+            <div className="bg-white rounded-2xl p-6 card-shadow border border-emerald-100">
+              <label className="block text-gray-700 text-sm font-bold mb-2 text-center">
+                น้ำหนักตัวเด็ก (กิโลกรัม)
+              </label>
+              <div className="relative max-w-xs mx-auto">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={weight}
+                  onChange={handleWeightChange}
+                  className="w-full text-center text-5xl font-bold text-emerald-600 border-b-2 border-emerald-200 focus:border-emerald-500 focus:outline-none bg-transparent placeholder-gray-200 py-2"
+                />
+                <span className="absolute right-0 bottom-4 text-gray-400 font-medium">kg</span>
+              </div>
+
+              {/* Quick Warning for very high weight */}
+              {parseFloat(weight) > 40 && (
+                <div className="mt-3 text-center text-orange-500 text-sm bg-orange-50 p-2 rounded-lg">
+                  <i className="fa-solid fa-triangle-exclamation mr-1"></i>
+                                    น้ำหนัก > 40 กก. ควรพิจารณาใช้ยาเม็ดหรือขนาดยาผู้ใหญ่
+                </div>
+              )}
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative">
+              <i className="fa-solid fa-search absolute left-3 top-3 text-gray-400"></i>
+              <input
+                type="text"
+                placeholder="ค้นหาชื่อยา (Ex. Para, Amox)..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-400 focus:outline-none"
+              />
+            </div>
+
+            {/* RESULT LIST (Zone B) */}
+            <div className="space-y-4">
+              {filteredDrugs.map(drug => {
+                const result = calculateDose(drug);
+                const hasWeight = parseFloat(weight) > 0;
+
+                return (
+                  <div key={drug.id} className="bg-white rounded-xl card-shadow overflow-hidden border border-gray-100">
+
+                    {/* Card Header */}
+                    <div className="p-4 border-b border-gray-50 flex justify-between items-start bg-gray-50/50">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-xl font-bold text-gray-800">{drug.name}</h3>
+                          <CategoryBadge label={drug.categoryLabel} colorClass={drug.color} />
+                        </div>
+                        <p className="text-xs text-gray-500">{drug.genericName}</p>
+                      </div>
+                      {/* Safety Warning Icon if applicable */}
+                      {drug.warning && (
+                        <div className="text-orange-500 tooltip" title={drug.warning}>
+                          <i className="fa-solid fa-circle-info"></i>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Card Body */}
+                    <div className="p-4 grid grid-cols-12 gap-4">
+
+                      {/* Configuration Column (Left) */}
+                      <div className="col-span-12 sm:col-span-7 space-y-3">
+
+                        {/* Concentration Select */}
+                        <div>
+                          <ConcentrationSelector
+                            concentrations={drug.concentrations}
+                            selectedIndex={selectedConcMap[drug.id] || 0}
+                            onChange={(idx) => handleConcChange(drug.id, idx)}
+                          />
+                        </div>
+
+                        {/* Hidden Details (Show mainly for Pharmacist check) */}
+                        <div className="text-xs text-gray-400 flex flex-col gap-1">
+                          <span>• Target Dose: {drug.defaultDoseMgPerKg} {drug.isVolumeBased ? 'ml/kg' : 'mg/kg'}</span>
+                          <span>• Freq: {drug.frequency}</span>
+                          {drug.warning && <span className="text-orange-500">• Note: {drug.warning}</span>}
+                        </div>
+                      </div>
+
+                      {/* Result Column (Right/Bottom) */}
+                      <div className={`col-span-12 sm:col-span-5 flex flex-col justify-center items-center rounded-lg p-3 transition-colors ${hasWeight ? 'bg-emerald-50 border border-emerald-100' : 'bg-gray-100'}`}>
+                        {!hasWeight ? (
+                          <span className="text-gray-400 text-sm">รอน้ำหนัก...</span>
+                        ) : (
+                          <>
+                            <div className="text-3xl font-bold text-emerald-700">
+                              {result.ml} <span className="text-lg font-normal">ml</span>
+                            </div>
+                            <div className="text-sm text-emerald-600 font-medium mt-1">
+                              ≈ {result.teaspoon} ช้อนชา
+                            </div>
+                            {!drug.isVolumeBased && (
+                              <div className="text-xs text-gray-500 mt-2 text-center">
+                                (Total: {result.doseMg} mg)
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredDrugs.length === 0 && (
+                <div className="text-center py-10 text-gray-400">
+                  <i className="fa-solid fa-box-open text-4xl mb-2"></i>
+                  <p>ไม่พบยาที่ค้นหา</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Disclaimer Footer */}
+          <footer className="text-center text-xs text-gray-400 p-4 mt-8 bg-gray-50">
+            <p>⚠️ POC for testing purposes only. Clinical verification required.</p>
+            <p>กรุณาตรวจสอบขนาดยากับเภสัชกรทุกครั้ง</p>
+          </footer>
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+
+</html>
