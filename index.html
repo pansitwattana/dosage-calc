@@ -60,6 +60,7 @@
         categoryLabel: 'ลดไข้ / แก้ปวด',
         color: 'bg-pink-100 text-pink-800',
         defaultDoseMgPerKg: 12, // Legacy: w*0.5 at 120/5 => (0.5*120)/5 = 12 mg/kg
+        maxSingleDoseMg: 1000,
         frequency: 'ทุก 4-6 ชม. เวลาปวด/มีไข้',
         concentrations: [
           { label: 'Syrup 120 mg / 5 ml', mg: 120, ml: 5 },
@@ -76,6 +77,9 @@
         categoryLabel: 'ลดไข้สูง / อักเสบ',
         color: 'bg-orange-100 text-orange-800',
         defaultDoseMgPerKg: 5, // Legacy: GA = w*0.25 at 100/5 => (0.25*100)/5 = 5 mg/kg
+        maxSingleDoseMg: 400,
+        minAgeMonths: 6,
+        ageWarning: 'ระวัง! ห้ามใช้ในเด็กอายุ < 6 เดือน (หรือใช้เฉพาะกรณีไข้สูงเช็ดตัวไม่ลง)',
         frequency: 'ทุก 6-8 ชม. หลังอาหารทันที',
         concentrations: [
           { label: 'Syrup 100 mg / 5 ml', mg: 100, ml: 5 },
@@ -105,6 +109,8 @@
         categoryLabel: 'ลดน้ำมูก / ภูมิแพ้',
         color: 'bg-yellow-100 text-yellow-800',
         defaultDoseMgPerKg: 0.1, // Legacy: BA = w*0.25 at 2/5 => (0.25*2)/5 = 0.1 mg/kg/dose
+        minAgeMonths: 24,
+        ageWarning: 'ระวัง! ไม่แนะนำในเด็ก < 2 ปี (เสมหะเหนียว/กดการหายใจ)',
         frequency: 'วันละ 3-4 ครั้ง หลังอาหาร',
         concentrations: [
           { label: 'Syrup 2 mg / 5 ml', mg: 2, ml: 5 }
@@ -133,6 +139,10 @@
         categoryLabel: 'ฆ่าเชื้อแบคทีเรีย',
         color: 'bg-blue-100 text-blue-800',
         defaultDoseMgPerKg: 12.5, // Legacy: HC2 = w*0.5 at 125/5 => (0.5*125)/5 = 12.5 mg/kg/dose
+        doseOptions: [
+          { label: 'Standard Dose (40 mg/kg/day)', val: 12.5 },
+          { label: 'High Dose (80-90 mg/kg/day)', val: 30 }
+        ],
         frequency: 'วันละ 3 ครั้ง หลังอาหาร',
         concentrations: [
           { label: 'Dry Syrup 125 mg / 5 ml', mg: 125, ml: 5 },
@@ -244,18 +254,28 @@
 
     function App() {
       const [weight, setWeight] = useState('');
+      const [ageYears, setAgeYears] = useState('');
+      const [ageMonths, setAgeMonths] = useState('');
       const [searchTerm, setSearchTerm] = useState('');
 
       // State เก็บ Index ของความเข้มข้นที่เลือก สำหรับยาแต่ละตัว { 'para': 0, 'amox': 1 }
       const [selectedConcMap, setSelectedConcMap] = useState({});
 
-      // Initialize default concentrations (index 0)
+      // State เก็บ Dose Option ที่เลือก สำหรับยาที่มีตัวเลือก (เช่น Amox High Dose) { 'amox': 0 }
+      const [selectedDoseOptMap, setSelectedDoseOptMap] = useState({});
+
+      // Initialize defaults
       useEffect(() => {
-        const defaults = {};
+        const concDefaults = {};
+        const doseDefaults = {};
         initialDrugs.forEach(drug => {
-          defaults[drug.id] = 0;
+          concDefaults[drug.id] = 0;
+          if (drug.doseOptions) {
+            doseDefaults[drug.id] = 0; // Default to first option (Standard)
+          }
         });
-        setSelectedConcMap(defaults);
+        setSelectedConcMap(concDefaults);
+        setSelectedDoseOptMap(doseDefaults);
       }, []);
 
       const handleWeightChange = (e) => {
@@ -272,9 +292,16 @@
         }));
       };
 
+      const handleDoseOptChange = (drugId, newIndex) => {
+        setSelectedDoseOptMap(prev => ({
+          ...prev,
+          [drugId]: newIndex
+        }));
+      };
+
       const calculateDose = (drug) => {
         const w = parseFloat(weight);
-        if (!w || w <= 0) return { ml: 0, teaspoon: 0, doseMg: 0 };
+        if (!w || w <= 0) return { ml: 0, teaspoon: 0, doseMg: 0, isCapped: false };
 
         // Special Case for Alum Milk (Volume Based)
         if (drug.isVolumeBased) {
@@ -282,17 +309,33 @@
           return {
             ml: vol.toFixed(1),
             teaspoon: (vol / 5).toFixed(1),
-            doseMg: '-'
+            doseMg: '-',
+            isCapped: false
           };
         }
 
         const concIndex = selectedConcMap[drug.id] || 0;
         const conc = drug.concentrations[concIndex];
 
+        // Determine Dose Mg/Kg (Standard or Selected Option)
+        let doseMgPerKg = drug.defaultDoseMgPerKg;
+        if (drug.doseOptions) {
+          const optIndex = selectedDoseOptMap[drug.id] || 0;
+          doseMgPerKg = drug.doseOptions[optIndex].val;
+        }
+
         // Logic: Volume (ml) = (Weight (kg) * Dose (mg/kg)) / Conc (mg/ml)
         // Conc (mg/ml) = conc.mg / conc.ml
 
-        const targetDoseTotalMg = w * drug.defaultDoseMgPerKg;
+        let targetDoseTotalMg = w * doseMgPerKg;
+        let isCapped = false;
+
+        // Max Dose Cap Logic
+        if (drug.maxSingleDoseMg && targetDoseTotalMg > drug.maxSingleDoseMg) {
+            targetDoseTotalMg = drug.maxSingleDoseMg;
+            isCapped = true;
+        }
+
         const concentrationMgPerMl = conc.mg / conc.ml;
 
         const volumeMl = targetDoseTotalMg / concentrationMgPerMl;
@@ -305,7 +348,8 @@
         return {
           ml: displayMl,
           teaspoon: teaspoon,
-          doseMg: targetDoseTotalMg.toFixed(0)
+          doseMg: targetDoseTotalMg.toFixed(0),
+          isCapped: isCapped
         };
       };
 
@@ -355,6 +399,30 @@
                 <span className="absolute right-0 bottom-4 text-gray-400 font-medium">kg</span>
               </div>
 
+              {/* Age Input */}
+              <div className="flex justify-center gap-4 mt-4">
+                <div className="w-24">
+                  <label className="block text-gray-500 text-xs text-center mb-1">อายุ (ปี)</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={ageYears}
+                    onChange={(e) => setAgeYears(e.target.value)}
+                    className="w-full text-center text-xl font-semibold text-gray-700 border-b border-gray-200 focus:border-emerald-500 focus:outline-none bg-transparent py-1"
+                  />
+                </div>
+                <div className="w-24">
+                  <label className="block text-gray-500 text-xs text-center mb-1">อายุ (เดือน)</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={ageMonths}
+                    onChange={(e) => setAgeMonths(e.target.value)}
+                    className="w-full text-center text-xl font-semibold text-gray-700 border-b border-gray-200 focus:border-emerald-500 focus:outline-none bg-transparent py-1"
+                  />
+                </div>
+              </div>
+
               {/* Quick Warning for very high weight */}
               {parseFloat(weight) > 40 && (
                 <div className="mt-3 text-center text-orange-500 text-sm bg-orange-50 p-2 rounded-lg">
@@ -382,11 +450,15 @@
                 const result = calculateDose(drug);
                 const hasWeight = parseFloat(weight) > 0;
 
+                // Age Warning Logic
+                const totalAgeMonths = (parseInt(ageYears || 0) * 12) + parseInt(ageMonths || 0);
+                const showAgeWarning = drug.minAgeMonths && totalAgeMonths > 0 && totalAgeMonths < drug.minAgeMonths;
+
                 return (
-                  <div key={drug.id} className="bg-white rounded-xl card-shadow overflow-hidden border border-gray-100">
+                  <div key={drug.id} className={`bg-white rounded-xl card-shadow overflow-hidden border ${showAgeWarning ? 'border-red-300' : 'border-gray-100'}`}>
 
                     {/* Card Header */}
-                    <div className="p-4 border-b border-gray-50 flex justify-between items-start bg-gray-50/50">
+                    <div className={`p-4 border-b border-gray-50 flex justify-between items-start ${showAgeWarning ? 'bg-red-50' : 'bg-gray-50/50'}`}>
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-xl font-bold text-gray-800">{drug.name}</h3>
@@ -401,6 +473,14 @@
                         </div>
                       )}
                     </div>
+
+                    {/* Age Warning Banner */}
+                    {showAgeWarning && (
+                        <div className="bg-red-100 px-4 py-2 text-red-700 text-sm font-semibold flex items-center gap-2">
+                             <i className="fa-solid fa-triangle-exclamation"></i>
+                             {drug.ageWarning}
+                        </div>
+                    )}
 
                     {/* Card Body */}
                     <div className="p-4 grid grid-cols-12 gap-4">
@@ -417,9 +497,30 @@
                           />
                         </div>
 
+                        {/* Dose Option Select (e.g. High Dose Amox) */}
+                        {drug.doseOptions && (
+                          <div className="relative inline-block w-full">
+                            <select
+                              className="block w-full px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
+                              value={selectedDoseOptMap[drug.id] || 0}
+                              onChange={(e) => handleDoseOptChange(drug.id, parseInt(e.target.value))}
+                            >
+                              {drug.doseOptions.map((opt, idx) => (
+                                <option key={idx} value={idx}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="text-xs text-blue-600 mt-1">
+                              <i className="fa-solid fa-user-doctor mr-1"></i>
+                              เลือกขนาดยา (Standard / High)
+                            </div>
+                          </div>
+                        )}
+
                         {/* Hidden Details (Show mainly for Pharmacist check) */}
                         <div className="text-xs text-gray-400 flex flex-col gap-1">
-                          <span>• Target Dose: {drug.defaultDoseMgPerKg} {drug.isVolumeBased ? 'ml/kg' : 'mg/kg'}</span>
+                          <span>• Target Dose: {drug.doseOptions ? drug.doseOptions[selectedDoseOptMap[drug.id] || 0].val : drug.defaultDoseMgPerKg} {drug.isVolumeBased ? 'ml/kg' : 'mg/kg'}</span>
                           <span>• Freq: {drug.frequency}</span>
                           {drug.warning && <span className="text-orange-500">• Note: {drug.warning}</span>}
                         </div>
@@ -440,6 +541,11 @@
                             {!drug.isVolumeBased && (
                               <div className="text-xs text-gray-500 mt-2 text-center">
                                 (Total: {result.doseMg} mg)
+                                {result.isCapped && (
+                                    <div className="text-orange-600 font-bold mt-1">
+                                        Max Dose Capped
+                                    </div>
+                                )}
                               </div>
                             )}
                           </>
