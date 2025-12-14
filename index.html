@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>Drug Dosage Calculator</title>
+    <title>Drug Dosage Calculator (คำนวณยาเด็ก) - Rx Kids</title>
+    <meta name="description" content="Pediatric dosage calculator by weight. เครื่องมือคำนวณขนาดยาเด็กตามน้ำหนัก (พารา, ไอบู, ยาฆ่าเชื้อ) แม่นยำ ใช้งานง่าย">
 
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -85,121 +86,116 @@
         const { useState, useEffect, useMemo } = React;
 
         // --- Data ---
-        // Updated to include English labels and style info to match the new UI design
+        // Updated to include English and Thai labels
         const initialDrugs = [
           {
             id: 'para',
-            name: 'Paracetamol',
-            subtext: 'Acetaminophen',
-            tag: 'Fever / Pain',
+            name: { en: 'Paracetamol', th: 'พาราเซตามอล' },
+            subtext: { en: 'Acetaminophen', th: 'ยาแก้ปวด / ลดไข้' },
+            tag: { en: 'Fever / Pain', th: 'ไข้ / ปวด' },
             tagColor: 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300',
 
             defaultDoseMgPerKg: 12,
             maxSingleDoseMg: 1000,
 
             // Text for UI
-            targetDoseText: '10-15 mg/kg',
-            freqText: 'Every 4-6 hrs (PRN)',
-            warningText: 'Max 5 doses/day (75mg/kg/day)',
+            targetDoseText: { en: '10-15 mg/kg', th: '10-15 มก./กก.' },
+            freqText: { en: 'Every 4-6 hrs (PRN)', th: 'ทุก 4-6 ชม. (เมื่อมีอาการ)' },
+            warningText: { en: 'Max 5 doses/day (75mg/kg/day)', th: 'ห้ามเกิน 5 ครั้ง/วัน (75 มก./กก./วัน)' },
             warningColor: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
             warningIcon: 'warning',
 
             concentrations: [
-              { label: 'Syrup 120 mg / 5 ml', mg: 120, ml: 5 },
-              { label: 'Syrup 250 mg / 5 ml', mg: 250, ml: 5 },
-              { label: 'Drops 100 mg / 1 ml', mg: 100, ml: 1 } // Updated to match screenshot (100mg/1ml) vs old (60mg/0.6ml)
+              { label: { en: 'Syrup 120 mg / 5 ml', th: 'ยาน้ำ 120 มก. / 5 มล.' }, mg: 120, ml: 5 },
+              { label: { en: 'Syrup 250 mg / 5 ml', th: 'ยาน้ำ 250 มก. / 5 มล.' }, mg: 250, ml: 5 },
+              { label: { en: 'Drops 100 mg / 1 ml', th: 'ยาหยด 100 มก. / 1 มล.' }, mg: 100, ml: 1 }
             ]
           },
           {
             id: 'ibu',
-            name: 'Ibuprofen',
-            subtext: 'NSAID',
-            tag: 'High Fever / Inflammation',
+            name: { en: 'Ibuprofen', th: 'ไอบูโพรเฟน' },
+            subtext: { en: 'NSAID', th: 'ยาแก้อักเสบ (NSAID)' },
+            tag: { en: 'High Fever / Inflammation', th: 'ไข้สูง / อักเสบ' },
             tagColor: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300',
 
-            defaultDoseMgPerKg: 10, // Adjusted to upper range to match screenshot implying strong effect, or keep 5-10
-            // Legacy was 5. Screenshot says "Target Dose: 5-10 mg/kg".
-            // I'll set default calc to 10 for "High Fever" or provide option?
-            // Let's stick to safe middle or legacy? Legacy was 5.
-            // I'll update default to 10 mg/kg as it is common for high fever, but safe range is 5-10.
-
+            defaultDoseMgPerKg: 10,
             maxSingleDoseMg: 400,
             minAgeMonths: 6,
-            ageWarning: 'Avoid if < 6 months',
+            ageWarning: { en: 'Avoid if < 6 months', th: 'ห้ามใช้ในเด็กอายุ < 6 เดือน' },
 
-            targetDoseText: '5-10 mg/kg',
-            freqText: 'Every 6-8 hrs w/ food',
-            warningText: 'Caution: Stomach irritation',
+            targetDoseText: { en: '5-10 mg/kg', th: '5-10 มก./กก.' },
+            freqText: { en: 'Every 6-8 hrs w/ food', th: 'ทุก 6-8 ชม. หลังอาหาร' },
+            warningText: { en: 'Caution: Stomach irritation', th: 'ระวังระคายเคืองกระเพาะ' },
             warningColor: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
             warningIcon: 'warning',
 
             concentrations: [
-              { label: 'Syrup 100 mg / 5 ml', mg: 100, ml: 5 },
-              { label: 'Syrup 200 mg / 5 ml', mg: 200, ml: 5 }
+              { label: { en: 'Syrup 100 mg / 5 ml', th: 'ยาน้ำ 100 มก. / 5 มล.' }, mg: 100, ml: 5 },
+              { label: { en: 'Syrup 200 mg / 5 ml', th: 'ยาน้ำ 200 มก. / 5 มล.' }, mg: 200, ml: 5 }
             ]
           },
           {
             id: 'gg',
-            name: 'Guaifenesin',
-            subtext: 'Expectorant',
-            tag: 'Cough / Phlegm',
+            name: { en: 'Guaifenesin', th: 'กัวเฟนิซิน' },
+            subtext: { en: 'Expectorant', th: 'ยาละลายเสมหะ' },
+            tag: { en: 'Cough / Phlegm', th: 'ไอ / เสมหะ' },
             tagColor: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-300',
 
-            defaultDoseMgPerKg: 5, // Per dose
+            defaultDoseMgPerKg: 5,
 
-            targetDoseText: '12 mg/kg/day', // UI text from screenshot
-            freqText: '3-4 times/day after meals',
-            warningText: 'Drink plenty of water',
+            targetDoseText: { en: '12 mg/kg/day', th: '12 มก./กก./วัน' },
+            freqText: { en: '3-4 times/day after meals', th: '3-4 ครั้ง/วัน หลังอาหาร' },
+            warningText: { en: 'Drink plenty of water', th: 'ดื่มน้ำตามมากๆ' },
             warningColor: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20',
             warningIcon: 'water_drop',
 
             concentrations: [
-              { label: 'Syrup 100 mg / 5 ml', mg: 100, ml: 5 }
+              { label: { en: 'Syrup 100 mg / 5 ml', th: 'ยาน้ำ 100 มก. / 5 มล.' }, mg: 100, ml: 5 }
             ]
           },
           {
             id: 'amox',
-            name: 'Amoxycillin',
-            subtext: 'Antibiotic',
-            tag: 'Infection',
+            name: { en: 'Amoxycillin', th: 'อะม็อกซีซิลลิน' },
+            subtext: { en: 'Antibiotic', th: 'ยาปฏิชีวนะ (ฆ่าเชื้อ)' },
+            tag: { en: 'Infection', th: 'ติดเชื้อ' },
             tagColor: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300',
 
             defaultDoseMgPerKg: 12.5,
             doseOptions: [
-              { label: 'Standard Dose (40 mg/kg/day)', val: 12.5 },
-              { label: 'High Dose (80-90 mg/kg/day)', val: 30 }
+              { label: { en: 'Standard Dose (40 mg/kg/day)', th: 'ขนาดปกติ (40 มก./กก./วัน)' }, val: 12.5 },
+              { label: { en: 'High Dose (80-90 mg/kg/day)', th: 'ขนาดสูง (80-90 มก./กก./วัน)' }, val: 30 }
             ],
 
-            targetDoseText: '40-90 mg/kg/day',
-            freqText: '3 times/day after meals',
-            warningText: 'Finish entire course',
+            targetDoseText: { en: '40-90 mg/kg/day', th: '40-90 มก./กก./วัน' },
+            freqText: { en: '3 times/day after meals', th: '3 ครั้ง/วัน หลังอาหาร' },
+            warningText: { en: 'Finish entire course', th: 'ทานจนหมดแผง/ขวด' },
             warningColor: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20',
             warningIcon: 'verified',
 
             concentrations: [
-              { label: 'Dry Syrup 125 mg / 5 ml', mg: 125, ml: 5 },
-              { label: 'Dry Syrup 250 mg / 5 ml', mg: 250, ml: 5 }
+              { label: { en: 'Dry Syrup 125 mg / 5 ml', th: 'ยาผงแห้ง 125 มก. / 5 มล.' }, mg: 125, ml: 5 },
+              { label: { en: 'Dry Syrup 250 mg / 5 ml', th: 'ยาผงแห้ง 250 มก. / 5 มล.' }, mg: 250, ml: 5 }
             ]
           },
           {
             id: 'cpm',
-            name: 'CPM',
-            subtext: 'Chlorpheniramine',
-            tag: 'Allergy / Runny Nose',
+            name: { en: 'CPM', th: 'ซีพีเอ็ม' },
+            subtext: { en: 'Chlorpheniramine', th: 'คลอร์เฟนิรามีน' },
+            tag: { en: 'Allergy / Runny Nose', th: 'ภูมิแพ้ / น้ำมูก' },
             tagColor: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-300',
 
             defaultDoseMgPerKg: 0.1,
             minAgeMonths: 24,
-            ageWarning: 'Avoid if < 2 years',
+            ageWarning: { en: 'Avoid if < 2 years', th: 'ห้ามใช้ในเด็กอายุ < 2 ปี' },
 
-            targetDoseText: '0.35 mg/kg/day',
-            freqText: '3-4 times/day',
-            warningText: 'May cause drowsiness',
+            targetDoseText: { en: '0.35 mg/kg/day', th: '0.35 มก./กก./วัน' },
+            freqText: { en: '3-4 times/day', th: '3-4 ครั้ง/วัน' },
+            warningText: { en: 'May cause drowsiness', th: 'อาจทำให้ง่วง' },
             warningColor: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
             warningIcon: 'bed',
 
             concentrations: [
-              { label: 'Syrup 2 mg / 5 ml', mg: 2, ml: 5 }
+              { label: { en: 'Syrup 2 mg / 5 ml', th: 'ยาน้ำ 2 มก. / 5 มล.' }, mg: 2, ml: 5 }
             ]
           }
         ];
@@ -241,14 +237,11 @@
             };
         }
 
-        const DrugCard = ({ drug, weight }) => {
+        const DrugCard = ({ drug, weight, lang, t }) => {
             const [concIndex, setConcIndex] = useState(0);
             const [doseOptIndex, setDoseOptIndex] = useState(0);
             const [showResult, setShowResult] = useState(false);
 
-            // Reset result view when weight changes significantly (optional, but good UX)
-            // But if user wants to see result, we keep it.
-            // If weight is invalid, hide result.
             useEffect(() => {
                 if (!weight || parseFloat(weight) <= 0) {
                     setShowResult(false);
@@ -263,11 +256,11 @@
                 <div className="group bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-soft hover:shadow-lg transition-all duration-300 fade-in border border-transparent hover:border-primary/20">
                     <div className="flex justify-between items-center mb-4">
                         <div>
-                            <h2 className="text-lg font-bold text-slate-800 dark:text-white group-hover:text-primary transition-colors">{drug.name}</h2>
-                            <span className="text-xs text-subtext-light dark:text-subtext-dark">{drug.subtext}</span>
+                            <h2 className="text-lg font-bold text-slate-800 dark:text-white group-hover:text-primary transition-colors">{t(drug.name)}</h2>
+                            <span className="text-xs text-subtext-light dark:text-subtext-dark">{t(drug.subtext)}</span>
                         </div>
                         <span className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-md ${drug.tagColor}`}>
-                            {drug.tag}
+                            {t(drug.tag)}
                         </span>
                     </div>
 
@@ -279,7 +272,7 @@
                             onChange={(e) => setConcIndex(parseInt(e.target.value))}
                         >
                             {drug.concentrations.map((c, i) => (
-                                <option key={i} value={i}>{c.label}</option>
+                                <option key={i} value={i}>{t(c.label)}</option>
                             ))}
                         </select>
                         <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-slate-500">
@@ -296,7 +289,7 @@
                                 onChange={(e) => setDoseOptIndex(parseInt(e.target.value))}
                             >
                                 {drug.doseOptions.map((opt, i) => (
-                                    <option key={i} value={i}>{opt.label}</option>
+                                    <option key={i} value={i}>{t(opt.label)}</option>
                                 ))}
                             </select>
                             <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-slate-500">
@@ -309,18 +302,24 @@
                     <div className="space-y-2 mb-4">
                         <div className="flex items-center gap-2 text-xs text-subtext-light dark:text-subtext-dark">
                             <span className="material-symbols-rounded text-primary text-base">science</span>
-                            <span>Target Dose: <strong className="text-slate-700 dark:text-slate-200">{drug.targetDoseText}</strong></span>
+                            <span>{lang === 'en' ? 'Target Dose' : 'ขนาดแนะนำ'}: <strong className="text-slate-700 dark:text-slate-200">{t(drug.targetDoseText)}</strong></span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-subtext-light dark:text-subtext-dark">
                             <span className="material-symbols-rounded text-primary text-base">schedule</span>
-                            <span>Freq: {drug.freqText}</span>
+                            <span>{lang === 'en' ? 'Freq' : 'ความถี่'}: {t(drug.freqText)}</span>
                         </div>
+                        {drug.ageWarning && (
+                             <div className="flex items-center gap-2 text-xs text-red-500">
+                                <span className="material-symbols-rounded text-base">warning</span>
+                                <span>{t(drug.ageWarning)}</span>
+                            </div>
+                        )}
 
                         {/* Warning */}
                         {drug.warningText && (
                             <div className={`flex items-start gap-2 text-xs p-2 rounded-lg ${drug.warningColor}`}>
                                 <span className="material-symbols-rounded text-base mt-0.5">{drug.warningIcon}</span>
-                                <span>{drug.warningText}</span>
+                                <span>{t(drug.warningText)}</span>
                             </div>
                         )}
                     </div>
@@ -329,12 +328,12 @@
                     {showResult && result ? (
                         <div className="w-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl p-3 flex justify-between items-center animate-fade-in">
                             <div>
-                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wide">Dosage</div>
-                                <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 leading-none">{result.ml} <span className="text-lg text-emerald-500">ml</span></div>
+                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wide">{lang === 'en' ? 'Dosage' : 'ขนาดยา'}</div>
+                                <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 leading-none">{result.ml} <span className="text-lg text-emerald-500">{lang === 'en' ? 'ml' : 'มล.'}</span></div>
                             </div>
                             <div className="text-right">
-                                <div className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{result.tsp} tsp</div>
-                                <div className="text-[10px] text-emerald-500">{result.mg} mg</div>
+                                <div className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{result.tsp} {lang === 'en' ? 'tsp' : 'ช้อนชา'}</div>
+                                <div className="text-[10px] text-emerald-500">{result.mg} {lang === 'en' ? 'mg' : 'มก.'}</div>
                             </div>
                         </div>
                     ) : (
@@ -350,7 +349,7 @@
                             }`}
                         >
                             <span className="material-symbols-rounded">calculate</span>
-                            Calculate Dosage
+                            {lang === 'en' ? 'Calculate Dosage' : 'คำนวณขนาดยา'}
                         </button>
                     )}
                 </div>
@@ -358,8 +357,16 @@
         };
 
         function App() {
+            const [lang, setLang] = useState('th');
             const [weight, setWeight] = useState('');
             const [searchTerm, setSearchTerm] = useState('');
+
+            // Translation Helper
+            const t = (obj) => {
+                if (!obj) return '';
+                if (typeof obj === 'string') return obj;
+                return obj[lang] || obj['en'] || '';
+            };
 
             const handleWeightChange = (e) => {
                 // allow empty or numbers
@@ -379,22 +386,34 @@
                 if (!searchTerm) return initialDrugs;
                 const lower = searchTerm.toLowerCase();
                 return initialDrugs.filter(d =>
-                    d.name.toLowerCase().includes(lower) ||
-                    d.subtext.toLowerCase().includes(lower) ||
-                    d.tag.toLowerCase().includes(lower)
+                    t(d.name).toLowerCase().includes(lower) ||
+                    t(d.subtext).toLowerCase().includes(lower) ||
+                    t(d.tag).toLowerCase().includes(lower)
                 );
-            }, [searchTerm]);
+            }, [searchTerm, lang]); // Depend on lang to re-filter if needed
 
             return (
                 <>
                     <header className="w-full max-w-md px-6 pt-8 pb-4 flex items-center justify-between sticky top-0 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md z-10 transition-colors duration-300">
                         <div>
-                            <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-white">Dosage Calculator</h1>
-                            <p className="text-xs text-subtext-light dark:text-subtext-dark">Pediatric Care Assistant</p>
+                            <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-white">{lang === 'en' ? 'Dosage Calculator' : 'คำนวณยาเด็ก'}</h1>
+                            <p className="text-xs text-subtext-light dark:text-subtext-dark">{lang === 'en' ? 'Pediatric Care Assistant' : 'ผู้ช่วยดูแลเด็ก'}</p>
                         </div>
-                        <button className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-300">
-                            <span className="material-symbols-rounded">settings</span>
-                        </button>
+                        <div className="flex gap-2 items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                            <button
+                                onClick={() => setLang('th')}
+                                className={`px-2 py-1 text-xs rounded-md transition-all ${lang === 'th' ? 'bg-white dark:bg-slate-600 shadow-sm font-bold text-primary' : 'text-slate-500 dark:text-slate-400'}`}
+                            >
+                                TH
+                            </button>
+                            <span className="text-slate-300">|</span>
+                            <button
+                                onClick={() => setLang('en')}
+                                className={`px-2 py-1 text-xs rounded-md transition-all ${lang === 'en' ? 'bg-white dark:bg-slate-600 shadow-sm font-bold text-primary' : 'text-slate-500 dark:text-slate-400'}`}
+                            >
+                                EN
+                            </button>
+                        </div>
                     </header>
 
                     <main className="w-full max-w-md px-6 space-y-6">
@@ -403,7 +422,7 @@
                             <div className="flex flex-col items-center space-y-4">
                                 <div className="flex items-center gap-2 text-primary font-medium">
                                     <span className="material-symbols-rounded text-2xl">monitor_weight</span>
-                                    <span>Child's Weight</span>
+                                    <span>{lang === 'en' ? "Child's Weight" : "น้ำหนักเด็ก"}</span>
                                 </div>
                                 <div className="relative w-full">
                                     <input
@@ -415,7 +434,7 @@
                                         value={weight}
                                         onChange={handleWeightChange}
                                     />
-                                    <span className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-medium text-lg">kg</span>
+                                    <span className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-medium text-lg">{lang === 'en' ? 'kg' : 'กก.'}</span>
                                 </div>
                                 <div className="flex gap-2 w-full justify-center">
                                     <button onClick={() => adjustWeight(0.5)} className="px-4 py-1 text-xs font-medium bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">+0.5</button>
@@ -432,7 +451,7 @@
                             </span>
                             <input
                                 className="w-full pl-12 pr-4 py-3 bg-white dark:bg-card-dark border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all shadow-sm text-sm"
-                                placeholder="Search medication..."
+                                placeholder={lang === 'en' ? "Search medication..." : "ค้นหายา..."}
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -443,14 +462,19 @@
                         <div className="space-y-4 pb-20">
                             {filteredDrugs.map((drug, index) => (
                                 <div key={drug.id} className="fade-in" style={{animationDelay: `${0.3 + (index * 0.1)}s`}}>
-                                    <DrugCard drug={drug} weight={weight} />
+                                    <DrugCard drug={drug} weight={weight} lang={lang} t={t} />
                                 </div>
                             ))}
                             {filteredDrugs.length === 0 && (
                                 <div className="text-center py-10 text-slate-400">
-                                    <p>No medication found.</p>
+                                    <p>{lang === 'en' ? "No medication found." : "ไม่พบข้อมูลยา"}</p>
                                 </div>
                             )}
+
+                             {/* SEO Footer / Glossary */}
+                            <footer className="text-xs text-gray-400 mt-10 p-6 text-center border-t border-slate-100 dark:border-slate-800">
+                                <p>Common searches: คำนวณยาพารา (Paracetamol Dosage), ยาแก้อักเสบเด็ก (Antibiotics), ยาลดน้ำมูก (Antihistamine)</p>
+                            </footer>
                         </div>
                     </main>
 
@@ -458,15 +482,15 @@
                     <nav className="fixed bottom-0 w-full max-w-md bg-white/90 dark:bg-card-dark/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 flex justify-around py-4 z-20">
                         <button className="flex flex-col items-center gap-1 text-primary">
                             <span className="material-symbols-rounded filled">calculate</span>
-                            <span className="text-[10px] font-medium">Calculator</span>
+                            <span className="text-[10px] font-medium">{lang === 'en' ? "Calculator" : "คำนวณ"}</span>
                         </button>
                         <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                             <span className="material-symbols-rounded">history</span>
-                            <span className="text-[10px] font-medium">History</span>
+                            <span className="text-[10px] font-medium">{lang === 'en' ? "History" : "ประวัติ"}</span>
                         </button>
                         <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                             <span className="material-symbols-rounded">medication</span>
-                            <span className="text-[10px] font-medium">Drugs</span>
+                            <span className="text-[10px] font-medium">{lang === 'en' ? "Drugs" : "รายการยา"}</span>
                         </button>
                     </nav>
                 </>
