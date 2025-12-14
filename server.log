@@ -1,0 +1,5 @@
+127.0.0.1 - - [14/Dec/2025 15:54:46] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [14/Dec/2025 15:55:37] code 404, message File not found
+127.0.0.1 - - [14/Dec/2025 15:55:37] "GET /robots.txt HTTP/1.1" 404 -
+127.0.0.1 - - [14/Dec/2025 15:55:40] "GET /index.html HTTP/1.0" 200 -
+127.0.0.1 - - [14/Dec/2025 15:56:08] "GET /index.html HTTP/1.1" 200 -
